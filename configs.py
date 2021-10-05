@@ -4,7 +4,7 @@ class ConfigParameters:
         self.gpu_id = "0"
         self.train_continue = "off"
 
-        self.num_modes = 2
+        self.num_modes = 3
         
         self.lr = 0.01
         self.batch_size = 100

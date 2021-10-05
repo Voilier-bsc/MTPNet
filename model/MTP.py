@@ -7,7 +7,7 @@ from model.Backbone import calculate_backbone_feature_dim
 ASV_DIM = 3  # velocity, acceleration, and heading change rate
 
 '''
-논문에서는 mobilenet v2를 backbone으로 사용하고 mode는 2일때 가장 우수, 6 seonds동안 prediction
+논문에서는 mobilenet v2를 backbone으로 사용하고 mode는 3일때 가장 우수, 6 seonds동안 prediction
 10Hz 사용하며 base CNN 이후 fully connected layer의 개수는 4096, 3 X 300 X 300 rasterized image - 0.2m resolution
 '''
  
