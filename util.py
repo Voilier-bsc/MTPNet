@@ -30,3 +30,7 @@ def load(ckpt_dir, net, optim):
     epoch = int(ckpt_lst[-1].split('epoch')[1].split('.pth')[0])
 
     return net, optim, epoch
+
+def NaN2Zero(target : torch.Tensor):
+    target[target != target] = 0
+    return target

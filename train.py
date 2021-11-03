@@ -6,12 +6,12 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-from dataset import Dataset
+from dataset.Dataset import MTPDataset
 from model.MTP import MTP
 import model.Backbone
 from loss import MTPLoss
 from configs import ConfigParameters
-from util import *
+import util 
 
 configs = ConfigParameters()
 
@@ -31,18 +31,15 @@ ckpt_dir = configs.ckpt_dir
 log_dir = configs.log_dir
 result_dir = configs.result_dir
 
-## create directory
-result_dir_train = os.path.join(result_dir, 'train')
-result_dir_val = os.path.join(result_dir, 'val')
-
 if not os.path.exists(ckpt_dir):
     os.makedirs(ckpt_dir)
 
 device = torch.device('cuda:{}'.format(gpu_id) if torch.cuda.is_available() else 'cpu')
 
 ## create dataloader
-dataset_train = Dataset(data_dir=data_dir, mode = 'train')
-dataset_val = Dataset(data_dir=data_dir, mode = 'val')
+
+dataset_train = MTPDataset(data_dir=data_dir, mode = 'train')
+dataset_val = MTPDataset(data_dir=data_dir, mode = 'val')
 
 loader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True)
 loader_val = DataLoader(dataset_val, batch_size=batch_size, shuffle=False)
@@ -50,11 +47,11 @@ loader_val = DataLoader(dataset_val, batch_size=batch_size, shuffle=False)
 
 ## model
 Backbone = model.Backbone.MobileNetBackbone()
-network = MTP(Backbone, num_modes)
+network = MTP(Backbone, num_modes).to(device)
 
 ## loss & optimizer
 criterion = MTPLoss(num_modes)
-optimizer = optim.Adam(model.parameters(), lr=lr)
+optimizer = optim.Adam(network.parameters(), lr=lr)
 
 # variable setting
 num_data_train = len(dataset_train)
@@ -67,22 +64,28 @@ num_batch_val = np.ceil(num_data_val / batch_size)
 writer_train = SummaryWriter(log_dir=os.path.join(log_dir, 'train'))
 writer_val = SummaryWriter(log_dir=os.path.join(log_dir, 'val'))
 
+## extra function
+fn_tonumpy = lambda x: x.to('cpu').detach().numpy()
+
+
+st_epoch = 0
 
 
 if mode == 'train':
     if train_continue == 'on':
-        network, optimizer, st_epoch = load(ckpt_dir=ckpt_dir, net=network, optim=optimizer)
-
+        network, optimizer, st_epoch = util.load(ckpt_dir=ckpt_dir, net=network, optim=optimizer)
+        
     ## train
     for epoch in range(st_epoch + 1, num_epoch + 1):
         network.train()
         loss_arr = []
 
         for batch, data in enumerate(loader_train):
+
             # forward pass
-            img = data['img'].to(device)
-            state = data['state'].to(device)
-            gt = data['gt'].to(device)
+            img = util.NaN2Zero(data['image']).to(device)
+            state = util.NaN2Zero(data['agent_state_vector']).to(device)
+            gt = util.NaN2Zero(data['ground_truth']).to(device)
 
             output = network(img, state)
         
@@ -102,8 +105,8 @@ if mode == 'train':
 
                 # use Tensorboard          
                 id = num_batch_train * (epoch - 1) + batch
-                writer_train.add_scalars('state',state, id)
-                writer_train.add_scalars('output',state, id)
+                writer_train.add_scalars('output',fn_tonumpy(output), id)
+                writer_train.add_scalars('gt',fn_tonumpy(gt.unsqueeze(1)), id)
 
         writer_train.add_scalar('loss', np.mean(loss_arr), epoch)
 
@@ -113,9 +116,9 @@ if mode == 'train':
             loss_arr = []
 
             for batch, data in enumerate(loader_val):
-                img = data['img'].to(device)
-                state = data['state'].to(device)
-                gt = data['gt'].to(device)
+                img = util.NaN2Zero(data['image']).to(device)
+                state = util.NaN2Zero(data['agent_state_vector']).to(device)
+                gt = util.NaN2Zero(data['ground_truth']).to(device)
 
                 output = network(img, state)
 
@@ -125,13 +128,13 @@ if mode == 'train':
                 if batch % 10 == 0:
                     print("VALID: EPOCH %04d / %04d | BATCH %04d / %04d | LOSS %.4f" %
                       (epoch, num_epoch, batch, num_batch_val, np.mean(loss_arr)))
-                    writer_val.add_scalars('state',state, id)
-                    writer_val.add_scalars('output',state, id)
+                    writer_val.add_scalars('output',fn_tonumpy(output), id)
+                    writer_val.add_scalars('gt',fn_tonumpy(gt.unsqueeze(1)), id)
 
         writer_val.add_scalar('loss', np.mean(loss_arr), epoch)
 
         if epoch % 20 == 0:
-            save(ckpt_dir=ckpt_dir, net=network, optim=optimizer, epoch=epoch)
+            util.save(ckpt_dir=ckpt_dir, net=network, optim=optimizer, epoch=epoch)
     
     writer_train.close()
     writer_val.close()

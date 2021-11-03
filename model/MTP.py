@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as f
 
-from model.Backbone import calculate_backbone_feature_dim
+from model.Backbone import *
 
 ASV_DIM = 3  # velocity, acceleration, and heading change rate
 
@@ -13,7 +13,8 @@ ASV_DIM = 3  # velocity, acceleration, and heading change rate
  
 
 class MTP(nn.Module):
-    def __init__(self, Backbone, num_modes, seconds=6, Hz = 10, n_hidden_layers = 4096, input_shape = (3,500,500), training = True):
+    def __init__(self, Backbone, num_modes, seconds=6, Hz = 2, n_hidden_layers = 4096, input_shape = (3,500,500), training = True):
+        super().__init__()
         self.Backbone = Backbone
         self.num_modes = num_modes
         self.training = training
